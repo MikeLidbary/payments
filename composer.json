@@ -11,7 +11,8 @@
         "laravel/framework": "5.3.*",
         "laravelcollective/html": "^5.3.0",
         "guzzlehttp/guzzle": "~5.2",
-        "paypal/rest-api-sdk-php": "*"
+        "paypal/rest-api-sdk-php": "*",
+        "collizo4sky/omnipay-2checkout": "*"
     },
     "require-dev": {
         "fzaninotto/faker": "~1.4",

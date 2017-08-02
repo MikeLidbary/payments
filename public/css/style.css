@@ -77,7 +77,7 @@
 .braintree-hosted-fields-valid {
 }
 
-#cardForm {
+#cardForm,#paypalForm,#tcoCCForm{
   max-width: 50.75em;
   margin: 0 auto;
   padding: 1.875em;

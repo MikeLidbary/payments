@@ -6,6 +6,9 @@ use Braintree\ClientToken;
 use Braintree\Transaction;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Input;
+use Omnipay\Omnipay;
+use Redirect;
+use Session;
 class SubscriptionController extends Controller
 {
 	public function index()
@@ -24,54 +27,73 @@ class SubscriptionController extends Controller
 		    ]
 		]);
 		if ($result->success == true) {
-			dd($result);
 			flash('Transaction completed successfully!')->success();
+			return Redirect::route( 'payment.receipt' )
+			->with( 'transaction_id',$result->transaction->id)
+			->with( 'amount',$request->input('amount'));
+			
 		}elseif ($result->success == false) {
-			// dd($result);
 			flash($result->message)->error();
+			return Redirect::route('maincheckout');
 		}
-		return redirect( '/subscription');
-	}
-
-	public function postPaymentWith2checkout(Request $request){
-
-	}
-
-	// other features you might be interested in
-
-	public function join() {
-		//check that we have nonce and plan in the incoming HTTP request
-		if( empty( Input::get( 'payment_method_nonce' ) ) || empty( Input::get( 'plan' ) ) ){
-			return redirect( '/subscription?success=false&message=' . urlencode( 'Invalid request' ), 400 );
-		}
-		//set user
-		$user = Auth::user();
-		try {
-			//Try to create subscription
-			$subscription = $user->newSubscription( 'main', Input::get( 'plan' ) )->create( Input::get( 'payment_method_nonce' ), [
-				'email' => $user->email
-			] );
-		} catch ( \ Exception $e ) {
-			//get message from caught error
-			$message = $e->getMessage();
-			//send back error message to view
-			return redirect( '/subscription/join?success=false&message=' . urlencode( $message ) );
-		}
-		//Go to subscription manage view beacuse all is well
-		return redirect( '/subscription/manage?success=true' );
 		
 	}
 
-	public function cancel()
-	{
-		$user = Auth::user();
-		$subscription =  $useruser->subscription('main')->cancel();
-		return redirect( '/subscription/manage?success=true' );
-	}
-	public function manage()
-	{
-		$user = Auth::user();
-		$subscriptions = $user->getSubscription();
-		return view('subscription-manage', ['subscriptions' => $subscriptions, ]);
-	}
+	public function postPaymentWith2checkout(Request $request){
+		// dd($request->all());
+		try {
+		    $gateway = Omnipay::create('TwoCheckoutPlus_Token');
+		    $gateway->setAccountNumber(env('2CHECKOUT_SELLER_ID'));
+		    $gateway->setTestMode(true);
+		    $gateway->setPrivateKey(env('2CHECKOUT_PRIVATE_KEY'));
+
+		    $formData = array(
+		        'firstName' => "fhhfhfhf",
+		        'lastName' => "mfdfdjfjd",
+		        'email' => "testingtester@2co.com",
+		        'billingAddress1' => "123 Test ST",
+		        'billingAddress2' => "485 HYJ GH",
+		        'billingCity' => "Columbus",
+		        'billingPostcode' => "458223",
+		        'billingState' => "OH",
+		        'billingCountry' => "USA",
+		    );
+		    $amount=(float) $request->input('amount');
+		    $purchase_request_data = array(
+		        'card' => $formData,
+		        'token' => $request->input('token'),
+		        'transactionId' => "123",
+		        'currency' => 'USD',
+		        'amount' => $amount,
+		    );
+
+		    $response = $gateway->purchase($purchase_request_data)->send();
+
+		    if ($response->isSuccessful()) {
+		        $transaction_ref = $response->getTransactionReference();
+		        flash("Success")->success();
+		        return Redirect::route( 'payment.receipt' )
+				->with( 'transaction_id', $transaction_ref)
+				->with( 'amount',$amount);
+		    } else {
+		        $error = $response->getMessage();
+		        flash($error)->error();
+		        return Redirect::route('maincheckout');
+		    }
+			} catch (Exception $e) {
+			    $e->getMessage();
+			    flash($e->getMessage())->error();
+			    return Redirect::route('maincheckout');
+			}
+		}
+
+		public function showReceipt(){
+			$transaction_id =Session::get('transaction_id');
+			$amount =Session::get('amount');
+			if($transaction_id==""){
+				return Redirect::route('maincheckout');
+			}
+			return view('subscription.receipt',compact('transaction_id','amount'));
+		}
+
 }

@@ -37,15 +37,7 @@ class PaypalController extends Controller
         $this->_api_context = new ApiContext(new OAuthTokenCredential($paypal_conf['client_id'], $paypal_conf['secret']));
         $this->_api_context->setConfig($paypal_conf['settings']);
     }
-    /**
-     * Show the application paywith paypalpage.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function payWithPaypal()
-    {
-        return view('paywithpaypal');
-    }
+
     /**
      * Store a details of payment with paypal.
      *
@@ -78,20 +70,15 @@ class PaypalController extends Controller
             ->setPayer($payer)
             ->setRedirectUrls($redirect_urls)
             ->setTransactions(array($transaction));
-            /** dd($payment->create($this->_api_context));exit; **/
         try {
             $payment->create($this->_api_context);
         } catch (\PayPal\Exception\PPConnectionException $ex) {
             if (\Config::get('app.debug')) {
             	flash("Connection timeout")->error();
-                return Redirect::route('withpaypal');
-                /** echo "Exception: " . $ex->getMessage() . PHP_EOL; **/
-                /** $err_data = json_decode($ex->getData(), true); **/
-                /** exit; **/
+                return Redirect::route('maincheckout');
             } else {
-                flash("Some error occur, sorry for inconvenient")->error();
-                return Redirect::route('withpaypal');
-                /** die('Some error occur, sorry for inconvenient'); **/
+                flash("Sorry, some error occurred, please try again")->error();
+                return Redirect::route('maincheckout');
             }
         }
         foreach($payment->getLinks() as $link) {
@@ -107,39 +94,46 @@ class PaypalController extends Controller
             return Redirect::away($redirect_url);
         }
         flash("Unknown error occurred")->error();
-        return Redirect::route('withpaypal');
+        return Redirect::route('maincheckout');
     }
+
     public function getPaymentStatus(Request $request)
     {
-    	// dd($request->all());
-        /** Get the payment ID before session clear **/
-        // $payment_id = Session::get('paypal_payment_id');
+
         $payment_id = $request->input('paymentId');
-        /** clear the session payment ID **/
-        // Session::forget('paypal_payment_id');
         if (empty($request->input('PayerID')) || empty($request->input('token'))) {
         	flash("Payment Failed")->error();
-            // \Session::put('error','Payment failed');
-            return Redirect::route('withpaypal');
+            return Redirect::route('maincheckout');
         }
         $payment = Payment::get($payment_id, $this->_api_context);
-        /** PaymentExecution object includes information necessary **/
-        /** to execute a PayPal account payment. **/
-        /** The payer_id is added to the request query parameters **/
-        /** when the user is redirected from paypal back to your site **/
         $execution = new PaymentExecution();
         $execution->setPayerId($request->input('PayerID'));
-        /**Execute the payment **/
-        $result = $payment->execute($execution, $this->_api_context);
-        /** dd($result);exit; /** DEBUG RESULT, remove it later **/
+        
+        try {
+			$result = $payment->execute($execution, $this->_api_context);
+		} catch (\PayPal\Exception\PPConnectionException $ex) {
+            if (\Config::get('app.debug')) {
+            	flash("Connection timeout")->error();
+                return Redirect::route('maincheckout');
+            } else {
+                flash("Sorry, some error occurred, please try again")->error();
+                return Redirect::route('maincheckout');
+            };
+		}catch (\PayPal\Exception\PayPalConnectionException $ex) {
+		    flash("Sorry, transaction failed")->error();
+		    return Redirect::route('maincheckout');
+		} catch (Exception $ex) {
+		    flash("Unknown error occurred")->error();
+		    return Redirect::route('maincheckout');
+		}
         if ($result->getState() == 'approved') { 
-            
-            /** it's all right **/
-            /** Here Write your database logic like that insert record or value in database if you want **/
             flash("Payment Success")->success();
-            return Redirect::route('withpaypal');
+            return Redirect::route( 'payment.receipt' )
+			->with( 'transaction_id',$payment_id)
+			->with( 'amount',$result->transactions[0]->amount->total);
         }
+
         flash("Payment Failed")->error();
-        return Redirect::route('withpaypal');
-    }
+        	return Redirect::route('maincheckout');
+    	}
   }

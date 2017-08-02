@@ -11,9 +11,9 @@
 |
 */
 
-Route::get('/', function () {
-    return view('welcome');
-});
+// Route::get('/', function () {
+//     return view('welcome');
+// });
 
 Auth::routes();
 
@@ -21,7 +21,8 @@ Route::get('/home', 'HomeController@index');
 
 // Route::group( [ 'middleware' => 'auth' ], function () {
 	//checkout
-	Route::get( '/checkout', array('as' => 'withpaypal','uses' => 'SubscriptionController@index' ));
+	Route::get( '/','SubscriptionController@index');
+	Route::get( '/checkout', array('as' => 'maincheckout','uses' => 'SubscriptionController@index' ));
 	Route::post( '/checkout',array('as' => 'addmoney.braintree', 'uses' => 'SubscriptionController@checkout'));
 
 	// paypal
@@ -29,5 +30,7 @@ Route::get('/home', 'HomeController@index');
 	Route::get('paypal', array('as' => 'payment.status','uses' => 'PaypalController@getPaymentStatus',));
 	// 2checkout
 	Route::post('2checkout', array('as' => 'addmoney.2checkout','uses' => 'SubscriptionController@postPaymentWith2checkout',));
+	// receipt
+	Route::get('receipt', array('as' => 'payment.receipt','uses' => 'SubscriptionController@showReceipt',));
 
 // });
